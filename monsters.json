@@ -1,0 +1,8 @@
+{
+    "monster_1" : [
+        {"name" : "bad", "path" : "media/monsters/monster_1/bad.png"},
+        {"name" : "ok","path" : "media/monsters/monster_1/ok.png"},
+        {"name" : "good","path" : "media/monsters/monster_1/good.png"}
+    ]
+
+}
