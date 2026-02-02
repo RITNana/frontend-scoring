@@ -18,12 +18,25 @@ let stringSesh = "000";
 
 let cycleDuration = 3000;
 let startTime;
-let timeLimit = 10; // 10 seconds
-let countDown;
+let totalTaskTime;
+let timeLimit = 45; // testing for a 45 second game 
+let globalCountdown
 
 let bgImg;
 let idleVid;
-let score;
+
+let score = 0;
+let taskSum = 0;
+let totalScore = 0;
+let multiplier;
+let scoringComplete = false;
+
+let scored_0_5 = false;
+let scored_5_10 = false;
+let scored_10_14 = false;
+let scored_15 = false;
+
+
 let sessionData;
 
 let complete = false;
@@ -46,12 +59,14 @@ function preload() {
   bgImg = loadImage("media/background.png");
 }
 
+
 function setup() {
   // Get the array of monsters for monster_1
   sessionSet = sessionData[stringSesh];
 
   let monsterType =
     monsterTypes[floor(random(monsterTypes.length))]; /*sessionSet.monsterType*/
+
 
   createCanvas(500, 900);
   console.log(monsterType);
@@ -72,30 +87,103 @@ function setup() {
   // startTime = millis();
 
   imageMode(CORNER);
+
 }
 
 function draw() {
   startTime = int(millis() / 1000); // converted to seconds for testing
-  countDown = timeLimit - startTime; // countdown starts at 10
+  totalTaskTime = startTime
+
+  globalCountdown = timeLimit - startTime
+
   if (complete) {
+
   } else {
     background(0);
     if (taskVideo) image(taskVideo, 0, 0, width, height);
   }
-
-  if (countDown < 0) {
-    countDown = 0;
+  
+if (!scoringComplete){
+  if (totalTaskTime >= 5 && !scored_0_5) {
+    let taskResult = scoring()
+    scored_0_5 = true;
+    totalScore += taskResult
   }
 
-  textSize(22);
-  fill("white");
-  text("Score: " + score, 300, 50);
+  if (totalTaskTime >= 10 && !scored_5_10) {
+    let taskResult = scoring()
+    scored_5_10 = true;
+    totalScore += taskResult
+  }
 
-  textSize(22);
-  fill("white");
-  text("Timer: " + countDown, 300, 20);
+  if (totalTaskTime >= 14 && !scored_10_14) {
+    let taskResult = scoring()
+    scored_10_14 = true
+    totalScore += taskResult
+  }
+
+  if (totalTaskTime >= 15 && !scored_15) {
+    let taskResult = scoring()
+    scored_15 = true
+    totalScore += taskResult
+  }
 }
 
-function finalMonster() { 
+ if (totalTaskTime >= 30) {
+    totalTaskTime = 0
+    scoringComplete = true
+  }
 
+
+
+  if (globalCountdown < 0) {
+    globalCountdown = 0
+  }
+
+
+
+  textSize(22);
+  fill("white");
+  text("Score: " + totalScore, 300, 50);
+
+  textSize(22);
+  fill("white");
+  text("Timer: " + totalTaskTime, 300, 20);
+
+  textSize(45);
+  fill("red")
+  text(globalCountdown, 240, 60)
+
+}
+
+function finalMonster() {
+
+}
+
+function scoring() {
+  if (totalTaskTime > 0 && totalTaskTime <= 5) {
+    score = int(random(45, 51))
+    multiplier = int(random(6.0, 8.1))
+    taskSum = score * multiplier
+    console.log("Excellent! " + taskSum)
+    return taskSum
+  }
+  else if (totalTaskTime > 5 && totalTaskTime <= 10) {
+    score = int(random(35, 41))
+    multiplier = int(random(3.0, 5.1))
+    taskSum = score * multiplier
+    console.log("Not too shabby " + taskSum)
+    return taskSum
+  } else if (totalTaskTime > 10 && totalTaskTime <= 14) {
+    score = int(random(30, 36))
+    multiplier = int(random(1.5, 3.1))
+    taskSum = score * multiplier
+    console.log("You can do better " + taskSum)
+    return taskSum
+  } else if (totalTaskTime >= 15) {
+    score = 25
+    taskSum = score
+    print("Are you even trying? " + taskSum)
+    return taskSum
+  }
 }
