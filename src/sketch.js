@@ -27,6 +27,15 @@ let complete = false;
 let monsterTypes = ["cat", "demon", "mummy", "lava", "spider", "wolf"];
 let monsterType;
 
+let finalBgImg = null;
+let finalBgLoading = false;
+let finalBgError = false;
+
+//fonts
+let pixelFont;
+
+
+
 /* STATION -> Monster counterpart
    STOMACH: Torso
    BRAINS: Arms
@@ -67,16 +76,40 @@ let scores;
 
 function preload() {
   sessionData = loadJSON("sessions.json");
-  bgImg = loadImage("./media/background.png");
+  bgImg = loadImage("./media/background.png"); //fallback
+  pixelFont = loadFont("./media/fonts/MatrixtypeDisplayBold-6R4e6.ttf");
 }
 
 function setup() {
-  createCanvas(500, 900);
+  //createCanvas(780, );
+  createCanvas(1078, 1915);
   imageMode(CORNER);
 
   sessionSet = sessionData[stringSesh];
   monsterType = "wolf"/*monsterTypes[sessionSet.monsterType]*/;
   console.log("monsterType:", monsterType);
+  // Load monster-specific final background: "<monsterType>-finalcard.png"
+  finalBgLoading = true;
+  finalBgError = false;
+  finalBgImg = null;
+
+  const finalBgPath = `./media/${monsterType}/${monsterType}-finalcard.png`;
+  console.log("loading final bg:", finalBgPath);
+
+  loadImage(
+    finalBgPath,
+    (img) => {
+      finalBgImg = img;
+      finalBgLoading = false;
+      console.log("Loaded final bg OK:", finalBgPath);
+    },
+    (err) => {
+      finalBgLoading = false;
+      finalBgError = true;
+      console.error("Failed to load final bg:", finalBgPath, err);
+    }
+  );
+
 
   // Create task video
   taskVideo = createVideo(`./media/${monsterType}/${monsterType}.mp4`, () => {
@@ -150,25 +183,38 @@ function draw() {
   if (globalCountdown < 0) globalCountdown = 0;
 
   if (complete) {
-    background(bgImg);
-
-    // draw layered monster (full canvas for now)
-    drawMonster(0, 0, width, height);
-
-    // optional: loading debug
-    fill(255);
-    textSize(14);
-    let yy = 40;
-    for (const p of PARTS) {
-      if (monsterLoading[p]) {
-        text(`Loading ${p}...`, 20, yy);
-        yy += 18;
-      } else if (monsterError[p]) {
-        text(`Failed ${p}`, 20, yy);
-        yy += 18;
-      }
+    if (finalBgImg) {
+      image(finalBgImg, 0, 0, width, height);
+    } else {
+      image(bgImg, 0, 0, width, height);
     }
-  } else {
+  
+    const scale = 0.58;
+    drawMonster(250, 370, width * scale, height * scale);
+
+    fill("white");
+    textFont(pixelFont);
+    textSize(115);
+    textAlign(CENTER, CENTER);
+    text(totalScore, 810, 1620);
+
+    textFont("sans-serif");
+
+  
+    // optional: show bg loading status
+    if (finalBgLoading) {
+      fill(255);
+      textSize(14);
+      text("Loading final card...", 20, 20);
+    } else if (finalBgError) {
+      fill(255, 100, 100);
+      textSize(14);
+      text("Final card missing (using fallback bg)", 20, 20);
+    }
+  
+    // ...your part loading debug block...
+  }
+   else {
     background(0);
     if (taskVideo) image(taskVideo, 0, 0, width, height);
   }
