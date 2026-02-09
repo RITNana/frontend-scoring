@@ -1,29 +1,12 @@
-//import shared session variable and current task variable
-/**
- * STATION:Monster Counterpart 
-STOMACH: Torso 
-BRAINS: Arms 
-HEAD: Eyes 
-BLEEDING: Arms
- */
-
-// Scoring Principles:
-// 0-5s : 45-50 points + multiplier (between 6.0 and 8.0 multiplier) - Good Monster Parts
-// 5-10s : 35 - 40 points + multiplier (between 3.0 and 5.0) - Medium Monster Parts
-// 10-14s : 30-35 points + multiplier (between 1.5 and 3.0) // Medium + Bad Monster Parts
-// 15s + : 25 points (no multiplier ) - Bad Monster Part
-
-
 let stringSesh = "000";
 
-let cycleDuration = 3000;
 let startTime;
 let totalTaskTime;
-let timeLimit = 45; // testing for a 45 second game 
-let globalCountdown
+let timeLimit = 45;
+let globalCountdown;
 
 let bgImg;
-let idleVid;
+let taskVideo;
 
 let score = 0;
 let taskSum = 0;
@@ -36,154 +19,396 @@ let scored_5_10 = false;
 let scored_10_14 = false;
 let scored_15 = false;
 
-
 let sessionData;
+let sessionSet;
 
 let complete = false;
 
 let monsterTypes = ["cat", "demon", "mummy", "lava", "spider", "wolf"];
+let monsterType;
 
-let monsterVids = [
-  "media/monsters/monster_1.mp4",
-  "media/monsters/monster_2.mp4",
-  "media/monsters/monster_3.mp4",
-  "media/monsters/monster_4.mp4",
-  "media/monsters/monster_5.mp4",
-  "media/monsters/monster_6.mp4",
-];
+let finalBgImg = null;
+let finalBgLoading = false;
+let finalBgError = false;
 
-function preload() {
-  // Load JSON data
-  sessionData = loadJSON("sessions.json");
+//fonts
+let pixelFont;
 
-  bgImg = loadImage("media/background.png");
+
+
+/* STATION -> Monster counterpart
+   STOMACH: Torso
+   BRAINS: Arms
+   HEAD: Eyes
+   BLEEDING: Legs  (if you truly mean arms, swap the mapping below)
+*/
+
+// ---------- Modular part state ----------
+const PARTS = ["torso", "head", "leftArm", "rightArm", "leftLeg", "rightLeg"];
+
+// holds loaded p5.Image objects per part
+let monsterImgs = {};
+let monsterLoading = {};
+let monsterError = {};
+
+for (const p of PARTS) {
+  monsterImgs[p] = null;
+  monsterLoading[p] = false;
+  monsterError[p] = "";
 }
 
+// Which limb score drives which part quality
+// NOTE: If BLEEDING should drive ARMS instead of LEGS, change leftLeg/rightLeg to brainScore or bleedingScore accordingly.
+const SCORE_FOR_PART = {
+  torso: (s) => s.stomachScore,       // STOMACH
+  leftArm: (s) => s.brainScore,       // BRAINS
+  rightArm: (s) => s.brainScore,      // BRAINS
+  head: (s) => s.eyeScore,            // HEAD (eyes)
+  leftLeg: (s) => s.bleedingScore,    // BLEEDING
+  rightLeg: (s) => s.bleedingScore,   // BLEEDING
+};
+
+// Draw order (back -> front)
+const LAYERS = ["leftLeg", "rightLeg", "torso", "leftArm", "rightArm", "head"];
+
+// If scoreCalc.js defines generateScores() globally (non-module)
+let scores;
+
+function preload() {
+  sessionData = loadJSON("sessions.json");
+  bgImg = loadImage("./media/background.png"); //fallback
+  pixelFont = loadFont("./media/fonts/MatrixtypeDisplayBold-6R4e6.ttf");
+  dogicaFont = loadFont("./media/fonts/dogica.ttf")
+}
 
 function setup() {
-  // Get the array of monsters for monster_1
+  //createCanvas(780, );
+  createCanvas(1078, 1915);
+  imageMode(CORNER);
+
   sessionSet = sessionData[stringSesh];
+  monsterType = "wolf";
+  //monsterType = monsterTypes[sessionSet.monsterType];
+  console.log("monsterType:", monsterType);
+  // Load monster-specific final background: "<monsterType>-finalcard.png"
+  finalBgLoading = true;
+  finalBgError = false;
+  finalBgImg = null;
 
-  let monsterType =
-    monsterTypes[floor(random(monsterTypes.length))]; /*sessionSet.monsterType*/
+  const finalBgPath = `./media/${monsterType}/${monsterType}-finalcard.png`;
+  console.log("loading final bg:", finalBgPath);
+
+  loadImage(
+    finalBgPath,
+    (img) => {
+      finalBgImg = img;
+      finalBgLoading = false;
+      console.log("Loaded final bg OK:", finalBgPath);
+    },
+    (err) => {
+      finalBgLoading = false;
+      finalBgError = true;
+      console.error("Failed to load final bg:", finalBgPath, err);
+    }
+  );
 
 
-  createCanvas(500, 900);
-  console.log(monsterType);
+  // Create task video
   taskVideo = createVideo(`./media/${monsterType}/${monsterType}.mp4`, () => {
-    // make it autoplay-safe
-    taskVideo.volume(0); // p5 wrapper volume
-    taskVideo.elt.muted = true; // HTML video must be muted
+    taskVideo.volume(0);
+    taskVideo.elt.muted = true;
     taskVideo.elt.setAttribute("muted", "");
-    taskVideo.elt.setAttribute("playsinline", ""); // iOS Safari inline playback
-    taskVideo.loop(); // or .play()
-    // taskVideo.play()
-    taskVideo.hide(); // we’ll draw it to the canvas
+    taskVideo.elt.setAttribute("playsinline", "");
+    taskVideo.loop();
+    taskVideo.hide();
   });
   taskVideo.loop();
   taskVideo.hide();
 
-  // Record start time
-  // startTime = millis();
-
-  imageMode(CORNER);
-
+  scores = generateScores();
+  console.log("stomach score:", scores.stomachScore);
 }
 
-function draw() {
-  startTime = int(millis() / 1000); // converted to seconds for testing
-  totalTaskTime = startTime
+// Load one part based on its mapped score -> quality -> file path
+function loadMonsterPart(part) {
+  const limbScore = SCORE_FOR_PART[part](scores);
+  const q = limbQuality(limbScore);
+  const path = `./media/${monsterType}/${q}/${q}-${part}.png`;
 
-  globalCountdown = timeLimit - startTime
+  console.log(`loading ${part}:`, path);
+
+  monsterLoading[part] = true;
+  monsterError[part] = "";
+  monsterImgs[part] = null;
+
+  loadImage(
+    path,
+    (img) => {
+      monsterImgs[part] = img;
+      monsterLoading[part] = false;
+      console.log(`Loaded ${part} OK:`, path);
+    },
+    (err) => {
+      monsterLoading[part] = false;
+      monsterError[part] = path;
+      console.error(`Failed to load ${part}:`, path, err);
+    }
+  );
+}
+
+//INSTEAD OF THE BUTTON
+//have this trigger as a result of the game ending
+function createMonster() {
+  complete = true;
+
+  // reset previous monster
+  for (const p of PARTS) {
+    monsterImgs[p] = null;
+    monsterLoading[p] = false;
+    monsterError[p] = "";
+  }
+
+  // load all parts
+  for (const p of PARTS) {
+    loadMonsterPart(p);
+  }
+}
+
+function drawMonster(x = 0, y = 0, w = width, h = height) {
+  for (const part of LAYERS) {
+    const img = monsterImgs[part];
+    if (img) image(img, x, y, w, h);
+  }
+}
+
+
+function drawGlowingText(txt, x, y, {
+  font,
+  size = 100,
+  glowColor = [255, 255, 255],
+  glowAlpha = 60,
+  glowRadius = 4,
+  mainColor = [255, 255, 255],
+  mainAlpha = 220
+}) {
+  push();
+  textFont(font);
+  textAlign(CENTER, CENTER);
+
+  // glow layer(s)
+  fill(glowColor[0], glowColor[1], glowColor[2], glowAlpha);
+  for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+    for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+      if (dx !== 0 || dy !== 0) {
+        textSize(size);
+        text(txt, x + dx, y + dy);
+      }
+    }
+  }
+
+  // main text
+  fill(mainColor[0], mainColor[1], mainColor[2], mainAlpha);
+  textSize(size);
+  text(txt, x, y);
+
+  pop();
+}
+
+
+function draw() {
+  totalTaskTime = int(millis() / 1000);
+  globalCountdown = timeLimit - totalTaskTime;
+  if (globalCountdown < 0) globalCountdown = 0;
 
   if (complete) {
+    if (finalBgImg) {
+      image(finalBgImg, 0, 0, width, height);
+    } else {
+      image(bgImg, 0, 0, width, height);
+    }
+  
+    if(monsterType == "wolf" || monsterType == "spider"){
+      const scale = 0.65;
+    drawMonster(200, 300, width * scale, height * scale);
+    }
+    else {
+      const scale = 0.58;
+      drawMonster(250, 370, width * scale, height * scale);
+    }
+    
+    totalScore = sessionSet.headScore + sessionSet.eyeScore + sessionSet.stomachScore + sessionSet.bleedingScore;
 
-  } else {
+    textAlign(LEFT)
+
+
+    //fill(255, 191);
+    //textFont(pixelFont);
+    //textSize(115);
+    //textAlign(CENTER, CENTER);
+    //text(totalScore, 830, 1620);
+
+    drawGlowingText(
+      totalScore,
+      830,
+      1620,
+      {
+        font: pixelFont,
+        size: 115,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    
+
+    textFont(dogicaFont);
+
+    textSize(29);
+    drawGlowingText(
+      `Head Score: ${sessionSet.headScore}`,
+      320,
+      1560,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Head Score: ${sessionSet.headScore}`, 310, 1560)
+    drawGlowingText(
+      `Eye Score: ${sessionSet.eyeScore}`,
+      305,
+      1610,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Eye Score: ${sessionSet.eyeScore}`, 295, 1610)
+    drawGlowingText(
+      `Stomach Score: ${sessionSet.stomachScore}`,
+      365,
+      1660,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Stomach Score: ${sessionSet.stomachScore}`, 355, 1660)
+    drawGlowingText(
+      `Bleeding Score: ${sessionSet.bleedingScore}`,
+      380,
+      1710,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 191
+      }
+    );
+    //text(`Bleeding Score: ${sessionSet.bleedingScore}`, 370, 1710)
+
+    textFont("sans-serif");
+  
+    // optional: show bg loading status
+    if (finalBgLoading) {
+      fill(255);
+      textSize(14);
+      text("Loading final card...", 20, 20);
+    } else if (finalBgError) {
+      fill(255, 100, 100);
+      textSize(14);
+      text("Final card missing (using fallback bg)", 20, 20);
+    }
+  
+    // ...your part loading debug block...
+  }
+   else {
     background(0);
     if (taskVideo) image(taskVideo, 0, 0, width, height);
   }
-  
-if (!scoringComplete){
-  if (totalTaskTime >= 5 && !scored_0_5) {
-    let taskResult = scoring()
-    scored_0_5 = true;
-    totalScore += taskResult
+
+  // Scoring gates
+  if (!scoringComplete) {
+    if (totalTaskTime >= 5 && !scored_0_5) { totalScore += scoring(); scored_0_5 = true; }
+    if (totalTaskTime >= 10 && !scored_5_10) { totalScore += scoring(); scored_5_10 = true; }
+    if (totalTaskTime >= 14 && !scored_10_14) { totalScore += scoring(); scored_10_14 = true; }
+    if (totalTaskTime >= 15 && !scored_15) { totalScore += scoring(); scored_15 = true; }
   }
 
-  if (totalTaskTime >= 10 && !scored_5_10) {
-    let taskResult = scoring()
-    scored_5_10 = true;
-    totalScore += taskResult
-  }
+  if (totalTaskTime >= timeLimit) scoringComplete = true;
 
-  if (totalTaskTime >= 14 && !scored_10_14) {
-    let taskResult = scoring()
-    scored_10_14 = true
-    totalScore += taskResult
-  }
-
-  if (totalTaskTime >= 15 && !scored_15) {
-    let taskResult = scoring()
-    scored_15 = true
-    totalScore += taskResult
-  }
+  //// UI
+  //fill("white");
+  //textSize(22);
+  //text("Score: " + totalScore, 300, 50);
+  //text("Timer: " + totalTaskTime, 300, 20);
+//
+  //fill("red");
+  //textSize(45);
+  //text(globalCountdown, 240, 90);
 }
 
- if (totalTaskTime >= 30) {
-    totalTaskTime = 0
-    scoringComplete = true
-  }
-
-
-
-  if (globalCountdown < 0) {
-    globalCountdown = 0
-  }
-
-
-
-  textSize(22);
-  fill("white");
-  text("Score: " + totalScore, 300, 50);
-
-  textSize(22);
-  fill("white");
-  text("Timer: " + totalTaskTime, 300, 20);
-
-  textSize(45);
-  fill("red")
-  text(globalCountdown, 240, 60)
-
-}
-
-function finalMonster() {
-
+function limbQuality(limbScore) {
+  if (limbScore <= 200) return "bad";
+  if (limbScore <= 399) return "medium";
+  return "good";
 }
 
 function scoring() {
   if (totalTaskTime > 0 && totalTaskTime <= 5) {
-    score = int(random(45, 51))
-    multiplier = int(random(6.0, 8.1))
-    taskSum = score * multiplier
-    console.log("Excellent! " + taskSum)
-    return taskSum
-  }
-  else if (totalTaskTime > 5 && totalTaskTime <= 10) {
-    score = int(random(35, 41))
-    multiplier = int(random(3.0, 5.1))
-    taskSum = score * multiplier
-    console.log("Not too shabby " + taskSum)
-    return taskSum
+    score = int(random(45, 51));
+    multiplier = random(6.0, 8.1);
+    taskSum = int(score * multiplier);
+    return taskSum;
+  } else if (totalTaskTime > 5 && totalTaskTime <= 10) {
+    score = int(random(35, 41));
+    multiplier = random(3.0, 5.1);
+    taskSum = int(score * multiplier);
+    return taskSum;
   } else if (totalTaskTime > 10 && totalTaskTime <= 14) {
-    score = int(random(30, 36))
-    multiplier = int(random(1.5, 3.1))
-    taskSum = score * multiplier
-    console.log("You can do better " + taskSum)
-    return taskSum
-  } else if (totalTaskTime >= 15) {
-    score = 25
-    taskSum = score
-    print("Are you even trying? " + taskSum)
-    return taskSum
+    score = int(random(30, 36));
+    multiplier = random(1.5, 3.1);
+    taskSum = int(score * multiplier);
+    return taskSum;
+  } else {
+    return 25;
   }
+}
+
+// ----- INTERACTION -----
+
+// Fallback: if the browser still blocks it, a click will start playback
+function mousePressed() {
+  if (taskVideo && taskVideo.elt && taskVideo.elt.paused) {
+    taskVideo.elt.muted = true; // ensure still muted
+    taskVideo.play();
+  }
+}
+
+//import from helper
+const toggleFullscreen = fullscreen();
+
+//make full screen
+function doubleClicked() {
+  toggleFullscreen(document.querySelector('canvas'));
 }
