@@ -34,6 +34,8 @@ let finalBgError = false;
 //fonts
 let pixelFont;
 
+const n = (v) => Number(v) || 0;
+
 
 
 /* STATION -> Monster counterpart
@@ -60,13 +62,14 @@ for (const p of PARTS) {
 // Which limb score drives which part quality
 // NOTE: If BLEEDING should drive ARMS instead of LEGS, change leftLeg/rightLeg to brainScore or bleedingScore accordingly.
 const SCORE_FOR_PART = {
-  torso: (s) => s.stomachScore,       // STOMACH
-  leftArm: (s) => s.brainScore,       // BRAINS
-  rightArm: (s) => s.brainScore,      // BRAINS
-  head: (s) => s.eyeScore,            // HEAD (eyes)
-  leftLeg: (s) => s.bleedingScore,    // BLEEDING
-  rightLeg: (s) => s.bleedingScore,   // BLEEDING
+  torso: (s) => s.stomachScore,
+  leftArm: (s) => s.brainScore,
+  rightArm: (s) => s.brainScore,
+  head: (s) => s.eyeScore,
+  leftLeg: (s) => s.bleedingScore,
+  rightLeg: (s) => s.bleedingScore,
 };
+
 
 // Draw order (back -> front)
 const LAYERS = ["leftLeg", "rightLeg", "torso", "leftArm", "rightArm", "head"];
@@ -87,8 +90,11 @@ function setup() {
   imageMode(CORNER);
 
   sessionSet = sessionData[stringSesh];
-  monsterType = "wolf";
-  //monsterType = monsterTypes[sessionSet.monsterType];
+  console.log("sessionSet:", sessionSet);
+  console.log("sessionSet keys:", Object.keys(sessionSet));
+
+  //monsterType = "wolf";
+  monsterType = monsterTypes[sessionSet.monsterType];
   console.log("monsterType:", monsterType);
   // Load monster-specific final background: "<monsterType>-finalcard.png"
   finalBgLoading = true;
@@ -125,13 +131,13 @@ function setup() {
   taskVideo.loop();
   taskVideo.hide();
 
-  scores = generateScores();
-  console.log("stomach score:", scores.stomachScore);
+  //scores = generateScores();
+  //console.log("stomach score:", scores.stomachScore);
 }
 
 // Load one part based on its mapped score -> quality -> file path
 function loadMonsterPart(part) {
-  const limbScore = SCORE_FOR_PART[part](scores);
+  const limbScore = SCORE_FOR_PART[part](sessionSet);
   const q = limbQuality(limbScore);
   const path = `./media/${monsterType}/${q}/${q}-${part}.png`;
 
