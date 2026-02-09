@@ -78,6 +78,7 @@ function preload() {
   sessionData = loadJSON("sessions.json");
   bgImg = loadImage("./media/background.png"); //fallback
   pixelFont = loadFont("./media/fonts/MatrixtypeDisplayBold-6R4e6.ttf");
+  dogicaFont = loadFont("./media/fonts/dogica.ttf")
 }
 
 function setup() {
@@ -86,7 +87,8 @@ function setup() {
   imageMode(CORNER);
 
   sessionSet = sessionData[stringSesh];
-  monsterType = "wolf"/*monsterTypes[sessionSet.monsterType]*/;
+  monsterType = "wolf";
+  //monsterType = monsterTypes[sessionSet.monsterType];
   console.log("monsterType:", monsterType);
   // Load monster-specific final background: "<monsterType>-finalcard.png"
   finalBgLoading = true;
@@ -154,6 +156,8 @@ function loadMonsterPart(part) {
   );
 }
 
+//INSTEAD OF THE BUTTON
+//have this trigger as a result of the game ending
 function createMonster() {
   complete = true;
 
@@ -177,6 +181,40 @@ function drawMonster(x = 0, y = 0, w = width, h = height) {
   }
 }
 
+
+function drawGlowingText(txt, x, y, {
+  font,
+  size = 100,
+  glowColor = [255, 255, 255],
+  glowAlpha = 60,
+  glowRadius = 4,
+  mainColor = [255, 255, 255],
+  mainAlpha = 220
+}) {
+  push();
+  textFont(font);
+  textAlign(CENTER, CENTER);
+
+  // glow layer(s)
+  fill(glowColor[0], glowColor[1], glowColor[2], glowAlpha);
+  for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+    for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+      if (dx !== 0 || dy !== 0) {
+        textSize(size);
+        text(txt, x + dx, y + dy);
+      }
+    }
+  }
+
+  // main text
+  fill(mainColor[0], mainColor[1], mainColor[2], mainAlpha);
+  textSize(size);
+  text(txt, x, y);
+
+  pop();
+}
+
+
 function draw() {
   totalTaskTime = int(millis() / 1000);
   globalCountdown = timeLimit - totalTaskTime;
@@ -189,17 +227,107 @@ function draw() {
       image(bgImg, 0, 0, width, height);
     }
   
-    const scale = 0.58;
-    drawMonster(250, 370, width * scale, height * scale);
+    if(monsterType == "wolf" || monsterType == "spider"){
+      const scale = 0.65;
+    drawMonster(200, 300, width * scale, height * scale);
+    }
+    else {
+      const scale = 0.58;
+      drawMonster(250, 370, width * scale, height * scale);
+    }
+    
+    totalScore = sessionSet.headScore + sessionSet.eyeScore + sessionSet.stomachScore + sessionSet.bleedingScore;
 
-    fill("white");
-    textFont(pixelFont);
-    textSize(115);
-    textAlign(CENTER, CENTER);
-    text(totalScore, 810, 1620);
+    textAlign(LEFT)
+
+
+    //fill(255, 191);
+    //textFont(pixelFont);
+    //textSize(115);
+    //textAlign(CENTER, CENTER);
+    //text(totalScore, 830, 1620);
+
+    drawGlowingText(
+      totalScore,
+      830,
+      1620,
+      {
+        font: pixelFont,
+        size: 115,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    
+
+    textFont(dogicaFont);
+
+    textSize(29);
+    drawGlowingText(
+      `Head Score: ${sessionSet.headScore}`,
+      320,
+      1560,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Head Score: ${sessionSet.headScore}`, 310, 1560)
+    drawGlowingText(
+      `Eye Score: ${sessionSet.eyeScore}`,
+      305,
+      1610,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Eye Score: ${sessionSet.eyeScore}`, 295, 1610)
+    drawGlowingText(
+      `Stomach Score: ${sessionSet.stomachScore}`,
+      365,
+      1660,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 200
+      }
+    );
+    //text(`Stomach Score: ${sessionSet.stomachScore}`, 355, 1660)
+    drawGlowingText(
+      `Bleeding Score: ${sessionSet.bleedingScore}`,
+      380,
+      1710,
+      {
+        font: dogicaFont,
+        size: 29,
+        glowColor: [255, 255, 255], // white glow
+        glowAlpha: 5,              // subtle
+        glowRadius: 5,              // small halo
+        mainColor: [255, 255, 255],
+        mainAlpha: 191
+      }
+    );
+    //text(`Bleeding Score: ${sessionSet.bleedingScore}`, 370, 1710)
 
     textFont("sans-serif");
-
   
     // optional: show bg loading status
     if (finalBgLoading) {
@@ -229,15 +357,15 @@ function draw() {
 
   if (totalTaskTime >= timeLimit) scoringComplete = true;
 
-  // UI
-  fill("white");
-  textSize(22);
-  text("Score: " + totalScore, 300, 50);
-  text("Timer: " + totalTaskTime, 300, 20);
-
-  fill("red");
-  textSize(45);
-  text(globalCountdown, 240, 90);
+  //// UI
+  //fill("white");
+  //textSize(22);
+  //text("Score: " + totalScore, 300, 50);
+  //text("Timer: " + totalTaskTime, 300, 20);
+//
+  //fill("red");
+  //textSize(45);
+  //text(globalCountdown, 240, 90);
 }
 
 function limbQuality(limbScore) {
@@ -265,4 +393,22 @@ function scoring() {
   } else {
     return 25;
   }
+}
+
+// ----- INTERACTION -----
+
+// Fallback: if the browser still blocks it, a click will start playback
+function mousePressed() {
+  if (taskVideo && taskVideo.elt && taskVideo.elt.paused) {
+    taskVideo.elt.muted = true; // ensure still muted
+    taskVideo.play();
+  }
+}
+
+//import from helper
+const toggleFullscreen = fullscreen();
+
+//make full screen
+function doubleClicked() {
+  toggleFullscreen(document.querySelector('canvas'));
 }
