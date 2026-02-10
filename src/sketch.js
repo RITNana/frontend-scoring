@@ -34,7 +34,11 @@ let finalBgError = false;
 //fonts
 let pixelFont;
 
-const n = (v) => Number(v) || 0;
+// animation stuff
+let transitionSequence;
+let fullFrames = 0;
+const FULL_FRAMES_TO_CONFIRM = 12; // ~12 frames ≈ 200ms at 60fps
+const DISMISS_DURATION = 600;
 
 
 
@@ -46,7 +50,7 @@ const n = (v) => Number(v) || 0;
 */
 
 // ---------- Modular part state ----------
-const PARTS = ["torso", "head", "leftArm", "rightArm", "leftLeg", "rightLeg"];
+const PARTS = ["leftArm", "rightArm", "torso", "head", "leftLeg", "rightLeg"];
 
 // holds loaded p5.Image objects per part
 let monsterImgs = {};
@@ -72,7 +76,7 @@ const SCORE_FOR_PART = {
 
 
 // Draw order (back -> front)
-const LAYERS = ["leftLeg", "rightLeg", "torso", "leftArm", "rightArm", "head"];
+const LAYERS = ["leftArm", "rightArm", "leftLeg", "rightLeg", "torso", "head"];
 
 // If scoreCalc.js defines generateScores() globally (non-module)
 let scores;
@@ -82,6 +86,7 @@ function preload() {
   bgImg = loadImage("./media/background.png"); //fallback
   pixelFont = loadFont("./media/fonts/MatrixtypeDisplayBold-6R4e6.ttf");
   dogicaFont = loadFont("./media/fonts/dogica.ttf")
+  transitionSequence = new pngAnimation("./media/TransitionOverlays", 70, 36)
 }
 
 function setup() {
@@ -167,6 +172,8 @@ function loadMonsterPart(part) {
 function createMonster() {
   complete = true;
 
+  transitionSequence.play();
+
   // reset previous monster
   for (const p of PARTS) {
     monsterImgs[p] = null;
@@ -227,11 +234,15 @@ function draw() {
   if (globalCountdown < 0) globalCountdown = 0;
 
   if (complete) {
+
+    
+
     if (finalBgImg) {
       image(finalBgImg, 0, 0, width, height);
     } else {
       image(bgImg, 0, 0, width, height);
     }
+    
   
     if(monsterType == "wolf" || monsterType == "spider"){
       const scale = 0.65;
@@ -335,7 +346,6 @@ function draw() {
 
     textFont("sans-serif");
   
-    // optional: show bg loading status
     if (finalBgLoading) {
       fill(255);
       textSize(14);
@@ -345,8 +355,11 @@ function draw() {
       textSize(14);
       text("Final card missing (using fallback bg)", 20, 20);
     }
+
+    //play TransitionOverlays png sequence here
+    //transitionSequence.play();
+    transitionSequence.draw(0,0,width, height);
   
-    // ...your part loading debug block...
   }
    else {
     background(0);
@@ -363,15 +376,7 @@ function draw() {
 
   if (totalTaskTime >= timeLimit) scoringComplete = true;
 
-  //// UI
-  //fill("white");
-  //textSize(22);
-  //text("Score: " + totalScore, 300, 50);
-  //text("Timer: " + totalTaskTime, 300, 20);
-//
-  //fill("red");
-  //textSize(45);
-  //text(globalCountdown, 240, 90);
+
 }
 
 function limbQuality(limbScore) {
